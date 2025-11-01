@@ -1,0 +1,5 @@
+body { background: #f7f7f9; }
+.navbar-brand { font-weight: 600; }
+#categories .nav-link { cursor: pointer; }
+.card-img-top { object-fit: cover; height: 180px; }
+.card-title { line-height: 1.2; }
