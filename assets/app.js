@@ -9,6 +9,7 @@ $(function () {
     page: 1,
     pageSize: 9,
     totalResults: 0,
+    loading: false,
   };
 
   // Elements
@@ -78,9 +79,11 @@ $(function () {
     }
   }
 
-  function renderArticles(articles) {
+  function renderArticles(articles, append = false) {
     if (!articles || !articles.length) {
-      $articles.html('<div class="col-12 text-center text-muted py-4">No news found.</div>');
+      if (!append) {
+        $articles.html('<div class="col-12 text-center text-muted py-4">No news found.</div>');
+      }
       return;
     }
     const cards = articles.map(a => {
@@ -108,7 +111,11 @@ $(function () {
         </div>
       </div>`;
     });
-    $articles.html(cards.join(''));
+    if (append) {
+      $articles.append(cards.join(''));
+    } else {
+      $articles.html(cards.join(''));
+    }
   }
 
   function updatePager() {
@@ -131,12 +138,14 @@ $(function () {
   }
 
   async function fetchNews() {
-    $articles.empty();
+    if (state.page === 1) $articles.empty();
+    state.loading = true;
     setLoading(true, 'Loading news…');
     if (!state.apiKey) {
       setLoading(false, 'Missing NEWS_API_KEY. Set it via assets/env.js');
       renderArticles([]);
       updatePager();
+      state.loading = false;
       return;
     }
 
@@ -147,7 +156,7 @@ $(function () {
       const data = await res.json();
       if (data.status !== 'ok') throw new Error(data.message || 'API error');
       state.totalResults = data.totalResults || 0;
-      renderArticles(data.articles || []);
+      renderArticles(data.articles || [], state.page > 1);
       updatePager();
       setLoading(false, `Showing ${data.articles?.length || 0} of ${state.totalResults}`);
     } catch (err) {
@@ -155,8 +164,22 @@ $(function () {
       setLoading(false, 'Failed to load news. Check API key, CORS, or quota.');
       renderArticles([]);
       updatePager();
+    } finally {
+      state.loading = false;
     }
   }
+
+  // Minimal infinite scroll: load next page when near bottom
+  $(window).on('scroll', function () {
+    const scrollBottom = $(window).scrollTop() + $(window).height();
+    const docHeight = $(document).height();
+    const threshold = 300; // px from bottom
+    const totalPages = Math.max(1, Math.ceil(state.totalResults / state.pageSize));
+    if (!state.loading && scrollBottom + threshold >= docHeight && state.page < totalPages) {
+      state.page++;
+      fetchNews();
+    }
+  });
   
 
   function escapeHtml(s) {
